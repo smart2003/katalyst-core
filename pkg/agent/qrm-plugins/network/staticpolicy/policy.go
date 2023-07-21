@@ -294,6 +294,9 @@ func (p *StaticPolicy) RemovePod(_ context.Context,
 		return nil, fmt.Errorf("RemovePod got nil req")
 	}
 
+	p.Lock()
+	defer p.Unlock()
+
 	if err := p.removePod(req.PodUid); err != nil {
 		general.ErrorS(err, "remove pod failed with error", "podUID", req.PodUid)
 		return nil, err
@@ -375,12 +378,17 @@ func (p *StaticPolicy) GetTopologyAwareResources(_ context.Context,
 		}
 	}
 
+	general.Infof("GetTopologyAwareResources: %+v", resp)
+
 	return resp, nil
 }
 
 // GetTopologyAwareAllocatableResources returns corresponding allocatable resources as topology aware format
 func (p *StaticPolicy) GetTopologyAwareAllocatableResources(_ context.Context,
 	_ *pluginapi.GetTopologyAwareAllocatableResourcesRequest) (*pluginapi.GetTopologyAwareAllocatableResourcesResponse, error) {
+	p.Lock()
+	defer p.Unlock()
+
 	machineState := p.state.GetMachineState()
 
 	topologyAwareAllocatableQuantityList := make([]*pluginapi.TopologyAwareQuantity, 0, len(machineState))
@@ -422,7 +430,7 @@ func (p *StaticPolicy) GetTopologyAwareAllocatableResources(_ context.Context,
 		aggregatedCapacityQuantity += uint64(nicState.EgressState.Capacity)
 	}
 
-	return &pluginapi.GetTopologyAwareAllocatableResourcesResponse{
+	resp := &pluginapi.GetTopologyAwareAllocatableResourcesResponse{
 		AllocatableResources: map[string]*pluginapi.AllocatableTopologyAwareResource{
 			string(apiconsts.ResourceNetBandwidth): {
 				IsNodeResource:                       false,
@@ -433,7 +441,11 @@ func (p *StaticPolicy) GetTopologyAwareAllocatableResources(_ context.Context,
 				TopologyAwareCapacityQuantityList:    topologyAwareCapacityQuantityList,
 			},
 		},
-	}, nil
+	}
+
+	general.Infof("GetTopologyAwareAllocatableResources: %+v", resp)
+
+	return resp, nil
 }
 
 // GetResourcePluginOptions returns options to be communicated with Resource Manager
